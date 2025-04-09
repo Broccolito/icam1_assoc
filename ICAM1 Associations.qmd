@@ -1,0 +1,101 @@
+---
+title: "ICAM1 Associations"
+author: "Wanjun Gu"
+format: pdf
+editor: visual
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(data.table)
+  library(ggplot2)
+  library(ggpubr)
+})
+geno = fread("genotype_master.csv")
+pheno = fread("cdp_phenotyping_master.csv")
+
+icam1 = select(geno, id, ICAM1_rs1799969G)
+
+icam1 = left_join(pheno, icam1, by = "id") |>
+  filter(genotype_exclude == 0)
+```
+
+*From the merged dataset, we select key variables for modeling: **SBP (`sbp_mean`)**, the ICAM1 genotype (`ICAM1_rs1799969G`, coded additively as 0/1/2 for A/G alleles), **sex**, and **BMI**.*
+
+```{r}
+icam1 = icam1 |>
+  select(sbp_mean, ICAM1_rs1799969G, sex, bmi)
+```
+
+### *Linear Regression: Additive Model (without BMI)*
+
+*We first assess the additive effect of the G allele on SBP, adjusting only for sex.*
+
+```{r}
+lm(data = icam1, formula = sbp_mean ~ ICAM1_rs1799969G + sex) |> 
+  summary()
+```
+
+### *Linear Regression: Additive Model (with BMI)*
+
+*Next, we adjust for potential confounding by body mass index (BMI).*
+
+```{r}
+lm(data = icam1, formula = sbp_mean ~ ICAM1_rs1799969G + sex + bmi) |> 
+  summary()
+```
+
+*In both models above, the **G allele of rs1799969** is significantly associated with **higher systolic blood pressure**, suggesting a potential functional role of this variant in regulating vascular physiology.*
+
+### *Linear Regression: Genotype as Categorical (without BMI)*
+
+*We now treat genotype as a categorical variable to allow for potential non-linear effects.*
+
+```{r}
+lm(data = icam1, formula = sbp_mean ~ as.factor(ICAM1_rs1799969G) + sex) |> 
+  summary()
+```
+
+### *Linear Regression: Genotype as Categorical (with BMI)*
+
+*We repeat this model, now adjusting for BMI.*
+
+```{r}
+lm(data = icam1, formula = sbp_mean ~ as.factor(ICAM1_rs1799969G) + sex + bmi) |> 
+  summary()
+```
+
+*These models reinforce our previous findings. Individuals carrying the **G allele** tend to have **higher SBP**, even when accounting for sex and BMI. This effect is consistent whether the genotype is treated as a continuous dosage or as a factor.*
+
+### *Visualization*
+
+*To visualize the relationship between genotype and SBP, we create a boxplot stratified by genotype and colored by sex.*
+
+```{r}
+plt = ggplot(data = icam1, aes(x = as.factor(ICAM1_rs1799969G), y = sbp_mean)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_point(aes(fill = sex), size = 2.5, color = "black", shape = 21, position = position_dodge2(0.2)) + 
+  scale_fill_manual(values = c("#80cba4", "#4965b0")) + 
+  xlab("ICAM1 rs1799969 (A>G)") + 
+  ylab("Systolic Blood Pressure (mmHg)") + 
+  labs(fill = "") +
+  theme_linedraw() + 
+  theme(text = element_text(size = 15))
+
+suppressWarnings(print(plt))
+```
+
+```{r}
+ggsave(filename = "icam1_association.png", device = "png", dpi = 1200, height = 5, width = 4)
+```
+
+### *Interpretation*
+
+*These results indicate that **rs1799969 in the ICAM1 gene is significantly associated with systolic blood pressure levels**, where **carriers of the G allele tend to exhibit higher SBP**.*
+
+*This association suggests a **protective role of the A allele**, which may contribute to lower vascular pressure through mechanisms involving endothelial adhesion or immune signaling, given ICAM1’s known biological functions.*
+
+*Interestingly, population genetic data show that the **A allele is substantially more common in Andean populations** compared to other global populations. This observation, combined with our association analysis, suggests that the **Andean-enriched A allele is associated with lower blood pressure**, potentially representing an adaptive cardiovascular trait in high-altitude environments.*
+
+*Further studies are warranted to investigate the functional mechanisms underlying this association and to explore whether similar effects are observed in other cohorts and ancestries.*
